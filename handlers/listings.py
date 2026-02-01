@@ -825,10 +825,22 @@ async def add_to_favorites(callback: CallbackQuery):
     """Add listing to favorites."""
     listing_id = int(callback.data.split(":")[1])
     user = await User.get_by_telegram_id(callback.from_user.id)
-    
+
     result = await Favorite.add(user.id, listing_id)
-    
+
     if result:
+        # Update the keyboard to show "remove from favorites" button
+        listing = await Listing.get_by_id(listing_id)
+        is_owner = listing.user_id == user.id if listing else False
+
+        # Update the message with new keyboard
+        try:
+            await callback.message.edit_reply_markup(
+                reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite=True)
+            )
+        except Exception:
+            pass  # Message might not be editable (e.g., media group)
+
         await callback.answer(MESSAGES["added_to_favorites"])
     else:
         await callback.answer("Уже в избранном!")
@@ -839,6 +851,19 @@ async def remove_from_favorites(callback: CallbackQuery):
     """Remove listing from favorites."""
     listing_id = int(callback.data.split(":")[1])
     user = await User.get_by_telegram_id(callback.from_user.id)
-    
+
     await Favorite.remove(user.id, listing_id)
+
+    # Update the keyboard to show "add to favorites" button
+    listing = await Listing.get_by_id(listing_id)
+    is_owner = listing.user_id == user.id if listing else False
+
+    # Update the message with new keyboard
+    try:
+        await callback.message.edit_reply_markup(
+            reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite=False)
+        )
+    except Exception:
+        pass  # Message might not be editable (e.g., media group)
+
     await callback.answer(MESSAGES["removed_from_favorites"])
