@@ -471,28 +471,33 @@ async def view_own_listing(callback: CallbackQuery, bot: Bot):
 
 
 @router.callback_query(F.data == "back_to_listings")
-async def back_to_listings(callback: CallbackQuery):
+async def back_to_listings(callback: CallbackQuery, bot: Bot):
     """Go back to listings view."""
     # Show recent listings
     listings = await Listing.get_recent(limit=PAGE_SIZE)
-    
+
+    # Delete the current message (could be text or photo)
+    await callback.message.delete()
+
     if not listings:
-        await callback.message.edit_text(
+        await bot.send_message(
+            callback.from_user.id,
             MESSAGES["no_listings"],
             reply_markup=get_main_menu_keyboard(),
             parse_mode="HTML",
         )
         await callback.answer()
         return
-    
+
     text = "🛍️ <b>Последние объявления</b>\n\nВыберите объявление для просмотра:"
-    
+
     keyboard = get_listings_keyboard(listings)
     keyboard.inline_keyboard.append([
         {"text": "◀️ В главное меню", "callback_data": "back_to_menu"}
     ])
-    
-    await callback.message.edit_text(
+
+    await bot.send_message(
+        callback.from_user.id,
         text,
         reply_markup=keyboard,
         parse_mode="HTML",
@@ -826,24 +831,21 @@ async def add_to_favorites(callback: CallbackQuery):
     listing_id = int(callback.data.split(":")[1])
     user = await User.get_by_telegram_id(callback.from_user.id)
 
-    result = await Favorite.add(user.id, listing_id)
+    await Favorite.add(user.id, listing_id)
 
-    if result:
-        # Update the keyboard to show "remove from favorites" button
-        listing = await Listing.get_by_id(listing_id)
-        is_owner = listing.user_id == user.id if listing else False
+    # Update the keyboard to show "remove from favorites" button
+    listing = await Listing.get_by_id(listing_id)
+    is_owner = listing.user_id == user.id if listing else False
 
-        # Update the message with new keyboard
-        try:
-            await callback.message.edit_reply_markup(
-                reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite=True)
-            )
-        except Exception:
-            pass  # Message might not be editable (e.g., media group)
+    # Update the message with new keyboard
+    try:
+        await callback.message.edit_reply_markup(
+            reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite=True)
+        )
+    except Exception:
+        pass  # Message might not be editable (e.g., media group)
 
-        await callback.answer(MESSAGES["added_to_favorites"])
-    else:
-        await callback.answer("Уже в избранном!")
+    await callback.answer(MESSAGES["added_to_favorites"])
 
 
 @router.callback_query(F.data.startswith("remove_favorite:"))
