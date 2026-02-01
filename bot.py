@@ -13,9 +13,10 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config import BOT_TOKEN, BOT_NAME
+from config import BOT_TOKEN, BOT_NAME, ADMIN_TELEGRAM_IDS
 from database.db import get_db, close_db
 from handlers import get_all_routers
+from middleware import AdminAuthMiddleware, AuditLoggerMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -44,9 +45,11 @@ async def on_startup(bot: Bot):
     bot_info = await bot.get_me()
     logger.info(f"Bot started: @{bot_info.username} ({bot_info.first_name})")
     
-    # Optional: Set bot commands menu
-    from aiogram.types import BotCommand
-    commands = [
+    # Set bot commands menu
+    from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
+
+    # Regular user commands
+    user_commands = [
         BotCommand(command="start", description="Start the bot / Main menu"),
         BotCommand(command="search", description="Search listings"),
         BotCommand(command="mylistings", description="View your listings"),
@@ -55,8 +58,23 @@ async def on_startup(bot: Bot):
         BotCommand(command="help", description="Get help"),
         BotCommand(command="cancel", description="Cancel current operation"),
     ]
-    await bot.set_my_commands(commands)
-    logger.info("Bot commands menu set")
+    await bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
+    logger.info("Bot commands menu set for regular users")
+
+    # Admin commands (for admin users only)
+    if ADMIN_TELEGRAM_IDS:
+        admin_commands = user_commands + [
+            BotCommand(command="admin", description="🔧 Admin Panel"),
+        ]
+        for admin_id in ADMIN_TELEGRAM_IDS:
+            try:
+                await bot.set_my_commands(
+                    admin_commands,
+                    scope=BotCommandScopeChat(chat_id=admin_id)
+                )
+            except Exception as e:
+                logger.warning(f"Could not set admin commands for {admin_id}: {e}")
+        logger.info(f"Admin commands set for {len(ADMIN_TELEGRAM_IDS)} admin users")
 
 
 async def on_shutdown(bot: Bot):
@@ -82,11 +100,18 @@ async def main():
     # Initialize dispatcher with memory storage for FSM
     # Note: For production, consider using Redis storage for persistence
     dp = Dispatcher(storage=MemoryStorage())
-    
+
+    # Register middleware (before routers)
+    dp.message.middleware(AdminAuthMiddleware())
+    dp.callback_query.middleware(AdminAuthMiddleware())
+    dp.message.middleware(AuditLoggerMiddleware())
+    dp.callback_query.middleware(AuditLoggerMiddleware())
+    logger.info("Admin middleware registered")
+
     # Register startup/shutdown handlers
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
-    
+
     # Include all routers
     for router in get_all_routers():
         dp.include_router(router)

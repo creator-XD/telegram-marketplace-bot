@@ -50,6 +50,9 @@ class Database:
                 is_verified INTEGER DEFAULT 0,
                 rating REAL DEFAULT 0.0,
                 rating_count INTEGER DEFAULT 0,
+                suspension_reason TEXT,
+                suspended_until TIMESTAMP,
+                warning_count INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -66,6 +69,8 @@ class Database:
                 location TEXT,
                 status TEXT DEFAULT 'active',  -- active, sold, reserved, deleted
                 views INTEGER DEFAULT 0,
+                flagged INTEGER DEFAULT 0,
+                flag_reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -125,6 +130,45 @@ class Database:
                 FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE
             );
             
+            -- Admin Users table
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                role TEXT NOT NULL,  -- super_admin, admin, moderator
+                permissions TEXT,  -- JSON array of permissions
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id)
+            );
+
+            -- Admin Audit Log table
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                id INTEGER PRIMARY KEY,
+                admin_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                target_type TEXT,  -- user, listing, transaction
+                target_id INTEGER,
+                details TEXT,  -- JSON details
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            -- User Warnings table
+            CREATE TABLE IF NOT EXISTS user_warnings (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                admin_id INTEGER NOT NULL,
+                reason TEXT NOT NULL,
+                severity TEXT DEFAULT 'low',  -- low, medium, high
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
             -- Indexes for better query performance
             CREATE INDEX IF NOT EXISTS idx_listings_user ON listings(user_id);
             CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
@@ -133,6 +177,10 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
             CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id);
             CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+            CREATE INDEX IF NOT EXISTS idx_admin_users_user ON admin_users(user_id);
+            CREATE INDEX IF NOT EXISTS idx_admin_audit_admin ON admin_audit_log(admin_id);
+            CREATE INDEX IF NOT EXISTS idx_admin_audit_target ON admin_audit_log(target_type, target_id);
+            CREATE INDEX IF NOT EXISTS idx_user_warnings_user ON user_warnings(user_id);
         """)
         await self.connection.commit()
         logger.info("Database tables initialized")

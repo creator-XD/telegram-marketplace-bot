@@ -22,6 +22,9 @@ class User:
     is_verified: bool = False
     rating: float = 0.0
     rating_count: int = 0
+    suspension_reason: Optional[str] = None
+    suspended_until: Optional[datetime] = None
+    warning_count: int = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
@@ -30,6 +33,23 @@ class User:
         """Create User from database row."""
         if row is None:
             return None
+
+        # Handle new admin fields that might not exist in older database schemas
+        try:
+            suspension_reason = row["suspension_reason"]
+        except (KeyError, IndexError):
+            suspension_reason = None
+
+        try:
+            suspended_until = row["suspended_until"]
+        except (KeyError, IndexError):
+            suspended_until = None
+
+        try:
+            warning_count = row["warning_count"]
+        except (KeyError, IndexError):
+            warning_count = 0
+
         return cls(
             id=row["id"],
             telegram_id=row["telegram_id"],
@@ -43,6 +63,9 @@ class User:
             is_verified=bool(row["is_verified"]),
             rating=row["rating"],
             rating_count=row["rating_count"],
+            suspension_reason=suspension_reason,
+            suspended_until=suspended_until,
+            warning_count=warning_count,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -130,6 +153,92 @@ class User:
             return f"@{self.username}"
         return f"User #{self.telegram_id}"
 
+    @classmethod
+    async def get_all(
+        cls,
+        status: str = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List["User"]:
+        """Get all users with optional filters (for admin)."""
+        db = await get_db()
+        conditions = []
+        params = []
+
+        if status == "active":
+            conditions.append("is_active = 1")
+        elif status == "blocked":
+            conditions.append("is_active = 0")
+        elif status == "verified":
+            conditions.append("is_verified = 1")
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        params.extend([limit, offset])
+
+        rows = await db.fetch_all(
+            f"""
+            SELECT * FROM users
+            WHERE {where_clause}
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            tuple(params)
+        )
+        return [cls.from_row(row) for row in rows]
+
+    @classmethod
+    async def count_all(cls, status: str = None) -> int:
+        """Count all users with optional filters (for admin)."""
+        db = await get_db()
+        conditions = []
+        params = []
+
+        if status == "active":
+            conditions.append("is_active = 1")
+        elif status == "blocked":
+            conditions.append("is_active = 0")
+        elif status == "verified":
+            conditions.append("is_verified = 1")
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        row = await db.fetch_one(
+            f"SELECT COUNT(*) as count FROM users WHERE {where_clause}",
+            tuple(params)
+        )
+        return row["count"] if row else 0
+
+    @classmethod
+    async def get_statistics(cls) -> dict:
+        """Get user statistics (for admin dashboard)."""
+        db = await get_db()
+
+        # Total users
+        total = await db.fetch_one("SELECT COUNT(*) as count FROM users")
+        # Active users
+        active = await db.fetch_one("SELECT COUNT(*) as count FROM users WHERE is_active = 1")
+        # Blocked users
+        blocked = await db.fetch_one("SELECT COUNT(*) as count FROM users WHERE is_active = 0")
+        # Verified users
+        verified = await db.fetch_one("SELECT COUNT(*) as count FROM users WHERE is_verified = 1")
+        # New users today
+        new_today = await db.fetch_one(
+            "SELECT COUNT(*) as count FROM users WHERE DATE(created_at) = DATE('now')"
+        )
+        # New users this week
+        new_week = await db.fetch_one(
+            "SELECT COUNT(*) as count FROM users WHERE created_at >= DATE('now', '-7 days')"
+        )
+
+        return {
+            "total": total["count"] if total else 0,
+            "active": active["count"] if active else 0,
+            "blocked": blocked["count"] if blocked else 0,
+            "verified": verified["count"] if verified else 0,
+            "new_today": new_today["count"] if new_today else 0,
+            "new_week": new_week["count"] if new_week else 0,
+        }
+
 
 @dataclass
 class Listing:
@@ -144,6 +253,8 @@ class Listing:
     location: Optional[str]
     status: str
     views: int
+    flagged: int
+    flag_reason: Optional[str]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     # Related data (loaded separately)
@@ -155,6 +266,18 @@ class Listing:
         """Create Listing from database row."""
         if row is None:
             return None
+
+        # Handle new admin fields that might not exist in older database schemas
+        try:
+            flagged = row["flagged"]
+        except (KeyError, IndexError):
+            flagged = 0
+
+        try:
+            flag_reason = row["flag_reason"]
+        except (KeyError, IndexError):
+            flag_reason = None
+
         return cls(
             id=row["id"],
             user_id=row["user_id"],
@@ -166,6 +289,8 @@ class Listing:
             location=row["location"],
             status=row["status"],
             views=row["views"],
+            flagged=flagged,
+            flag_reason=flag_reason,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -351,7 +476,7 @@ class Listing:
         db = await get_db()
         rows = await db.fetch_all(
             """
-            SELECT * FROM listings 
+            SELECT * FROM listings
             WHERE category = ? AND status = 'active'
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
@@ -359,6 +484,110 @@ class Listing:
             (category, limit, offset)
         )
         return [cls.from_row(row) for row in rows]
+
+    @classmethod
+    async def get_all_admin(
+        cls,
+        status: str = None,
+        category: str = None,
+        flagged_only: bool = False,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List["Listing"]:
+        """Get all listings with filters (for admin)."""
+        db = await get_db()
+        conditions = []
+        params = []
+
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+
+        if category:
+            conditions.append("category = ?")
+            params.append(category)
+
+        if flagged_only:
+            conditions.append("flagged = 1")
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        params.extend([limit, offset])
+
+        rows = await db.fetch_all(
+            f"""
+            SELECT * FROM listings
+            WHERE {where_clause}
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            tuple(params)
+        )
+        return [cls.from_row(row) for row in rows]
+
+    @classmethod
+    async def count_all_admin(
+        cls,
+        status: str = None,
+        category: str = None,
+        flagged_only: bool = False
+    ) -> int:
+        """Count all listings with filters (for admin)."""
+        db = await get_db()
+        conditions = []
+        params = []
+
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+
+        if category:
+            conditions.append("category = ?")
+            params.append(category)
+
+        if flagged_only:
+            conditions.append("flagged = 1")
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        row = await db.fetch_one(
+            f"SELECT COUNT(*) as count FROM listings WHERE {where_clause}",
+            tuple(params)
+        )
+        return row["count"] if row else 0
+
+    @classmethod
+    async def get_statistics(cls) -> dict:
+        """Get listing statistics (for admin dashboard)."""
+        db = await get_db()
+
+        # Total listings
+        total = await db.fetch_one("SELECT COUNT(*) as count FROM listings")
+        # Active listings
+        active = await db.fetch_one("SELECT COUNT(*) as count FROM listings WHERE status = 'active'")
+        # Sold listings
+        sold = await db.fetch_one("SELECT COUNT(*) as count FROM listings WHERE status = 'sold'")
+        # Deleted listings
+        deleted = await db.fetch_one("SELECT COUNT(*) as count FROM listings WHERE status = 'deleted'")
+        # Flagged listings
+        flagged = await db.fetch_one("SELECT COUNT(*) as count FROM listings WHERE flagged = 1")
+        # New listings today
+        new_today = await db.fetch_one(
+            "SELECT COUNT(*) as count FROM listings WHERE DATE(created_at) = DATE('now')"
+        )
+        # New listings this week
+        new_week = await db.fetch_one(
+            "SELECT COUNT(*) as count FROM listings WHERE created_at >= DATE('now', '-7 days')"
+        )
+
+        return {
+            "total": total["count"] if total else 0,
+            "active": active["count"] if active else 0,
+            "sold": sold["count"] if sold else 0,
+            "deleted": deleted["count"] if deleted else 0,
+            "flagged": flagged["count"] if flagged else 0,
+            "new_today": new_today["count"] if new_today else 0,
+            "new_week": new_week["count"] if new_week else 0,
+        }
 
 
 @dataclass
@@ -591,3 +820,71 @@ class Transaction:
         )
         row = await db.fetch_one("SELECT * FROM transactions WHERE id = ?", (cursor.lastrowid,))
         return cls.from_row(row)
+
+    @classmethod
+    async def get_all(
+        cls,
+        status: str = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List["Transaction"]:
+        """Get all transactions with filters (for admin)."""
+        db = await get_db()
+
+        if status:
+            rows = await db.fetch_all(
+                """
+                SELECT * FROM transactions
+                WHERE status = ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (status, limit, offset)
+            )
+        else:
+            rows = await db.fetch_all(
+                """
+                SELECT * FROM transactions
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (limit, offset)
+            )
+
+        return [cls.from_row(row) for row in rows]
+
+    @classmethod
+    async def count_all(cls, status: str = None) -> int:
+        """Count all transactions with filters (for admin)."""
+        db = await get_db()
+
+        if status:
+            row = await db.fetch_one(
+                "SELECT COUNT(*) as count FROM transactions WHERE status = ?",
+                (status,)
+            )
+        else:
+            row = await db.fetch_one("SELECT COUNT(*) as count FROM transactions")
+
+        return row["count"] if row else 0
+
+    @classmethod
+    async def get_statistics(cls) -> dict:
+        """Get transaction statistics (for admin dashboard)."""
+        db = await get_db()
+
+        # Total transactions
+        total = await db.fetch_one("SELECT COUNT(*) as count FROM transactions")
+        # Pending
+        pending = await db.fetch_one("SELECT COUNT(*) as count FROM transactions WHERE status = 'pending'")
+        # Completed
+        completed = await db.fetch_one("SELECT COUNT(*) as count FROM transactions WHERE status = 'completed'")
+        # Cancelled
+        cancelled = await db.fetch_one("SELECT COUNT(*) as count FROM transactions WHERE status = 'cancelled'")
+
+        return {
+            "total": total["count"] if total else 0,
+            "pending": pending["count"] if pending else 0,
+            "completed": completed["count"] if completed else 0,
+            "cancelled": cancelled["count"] if cancelled else 0,
+        }

@@ -3,20 +3,28 @@ Configuration settings for the Telegram Marketplace Bot.
 """
 import os
 from typing import List
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Bot Configuration
-BOT_TOKEN = "8595936447:AAGS-WEqSVaY53qx6Y9J54vxw9GehlukVEI"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN not found in environment variables. Please check your .env file.")
 
 # Database Configuration
-# SQLite (default for prototype)
-DATABASE_URL = "marketplace.db"
-
-# PostgreSQL (uncomment for production)
-# DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/marketplace")
+DATABASE_URL = os.getenv("DATABASE_URL", "marketplace.db")
 
 # Bot Settings
-BOT_NAME = "Telegram Trade bot"
+BOT_NAME = os.getenv("BOT_NAME", "Telegram Trade bot")
 SUPPORT_USERNAME = "@tradetesttt_bot"
+
+# Admin Configuration
+ADMIN_TELEGRAM_IDS = [
+    int(id.strip()) for id in os.getenv("ADMIN_TELEGRAM_IDS", "").split(",") if id.strip()
+]
+SUPER_ADMIN_ID = int(os.getenv("SUPER_ADMIN_ID", "0")) if os.getenv("SUPER_ADMIN_ID") else None
 
 # Listing Settings
 MAX_PHOTOS = 5
@@ -113,3 +121,39 @@ FEATURES = {
     "verified_sellers": False,
     "promoted_listings": False,
 }
+
+# Admin Role Permissions
+ADMIN_ROLES = {
+    "super_admin": [
+        "manage_users",
+        "manage_listings",
+        "manage_transactions",
+        "view_analytics",
+        "manage_admins",
+        "view_audit_log",
+        "edit_any_listing",
+        "delete_any_listing",
+        "block_users",
+        "warn_users",
+    ],
+    "admin": [
+        "manage_users",
+        "manage_listings",
+        "manage_transactions",
+        "view_analytics",
+        "view_audit_log",
+        "edit_any_listing",
+        "delete_any_listing",
+        "block_users",
+        "warn_users",
+    ],
+    "moderator": [
+        "manage_listings",
+        "warn_users",
+        "view_analytics",
+        "edit_any_listing",
+    ],
+}
+
+# Admin Settings
+ADMIN_PAGE_SIZE = 10  # Items per page in admin panel

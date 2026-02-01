@@ -45,3 +45,19 @@ class ProfileStates(StatesGroup):
     editing_phone = State()
     editing_location = State()
     editing_bio = State()
+
+
+class AdminStates(StatesGroup):
+    """States for admin operations."""
+    # User management
+    blocking_user = State()
+    warning_user = State()
+    editing_user_profile = State()
+
+    # Listing management
+    flagging_listing = State()
+    editing_listing = State()
+    deleting_listing = State()
+
+    # Analytics filtering
+    filtering_analytics = State()
