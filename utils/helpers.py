@@ -211,3 +211,28 @@ def validate_description(text: str) -> tuple[bool, str]:
         return False, "Описание не может превышать 2000 символов."
 
     return True, ""
+
+
+async def safe_edit_or_answer(callback_query, text: str, **kwargs):
+    """
+    Safely edit message or send new one if editing fails.
+
+    This handles cases where callback is triggered from a photo message
+    where edit_text() would fail.
+
+    Args:
+        callback_query: The CallbackQuery object
+        text: Text to send
+        **kwargs: Additional parameters like reply_markup, parse_mode, etc.
+    """
+    try:
+        # Try to edit the message text
+        await callback_query.message.edit_text(text, **kwargs)
+    except Exception:
+        # If editing fails (e.g., message is a photo), delete and send new message
+        try:
+            await callback_query.message.delete()
+        except Exception:
+            pass  # Ignore if message can't be deleted
+
+        await callback_query.message.answer(text, **kwargs)

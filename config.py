@@ -20,6 +20,9 @@ DATABASE_URL = os.getenv("DATABASE_URL", "marketplace.db")
 BOT_NAME = os.getenv("BOT_NAME", "Telegram Trade bot")
 SUPPORT_USERNAME = "@tradetesttt_bot"
 
+# Assets
+WELCOME_IMAGE_PATH = "assets/images/menu.jpg"
+
 # Admin Configuration
 ADMIN_TELEGRAM_IDS = [
     int(id.strip()) for id in os.getenv("ADMIN_TELEGRAM_IDS", "").split(",") if id.strip()

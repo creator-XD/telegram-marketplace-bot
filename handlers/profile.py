@@ -14,7 +14,7 @@ from keyboards import (
 )
 from keyboards.keyboards import remove_keyboard
 from states import ProfileStates
-from utils.helpers import format_user_profile, escape_html
+from utils.helpers import format_user_profile, escape_html, safe_edit_or_answer
 
 logger = logging.getLogger(__name__)
 router = Router(name="profile")
@@ -47,17 +47,18 @@ async def callback_profile(callback: CallbackQuery, state: FSMContext):
     """Show user profile."""
     await state.clear()
     user = await User.get_by_telegram_id(callback.from_user.id)
-    
+
     # Get user stats
     active_listings = await Listing.get_by_user(user.id, status="active")
     sold_listings = await Listing.get_by_user(user.id, status="sold")
-    
+
     text = format_user_profile(user)
     text += f"\n📊 <b>Статистика:</b>\n"
     text += f"• Активных объявлений: {len(active_listings)}\n"
     text += f"• Продано товаров: {len(sold_listings)}\n"
-    
-    await callback.message.edit_text(
+
+    await safe_edit_or_answer(
+        callback,
         text,
         reply_markup=get_profile_keyboard(),
         parse_mode="HTML",
@@ -89,11 +90,12 @@ def get_profile_keyboard():
 async def edit_location(callback: CallbackQuery, state: FSMContext):
     """Start location editing."""
     await state.set_state(ProfileStates.editing_location)
-    
+
     user = await User.get_by_telegram_id(callback.from_user.id)
     current_location = user.location or "Не указано"
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(
+        callback,
         f"📍 <b>Изменить местоположение</b>\n\n"
         f"Текущее: {escape_html(current_location)}\n\n"
         f"Введите ваше новое местоположение:\n\n"
@@ -134,11 +136,12 @@ async def process_location(message: Message, state: FSMContext):
 async def edit_bio(callback: CallbackQuery, state: FSMContext):
     """Start bio editing."""
     await state.set_state(ProfileStates.editing_bio)
-    
+
     user = await User.get_by_telegram_id(callback.from_user.id)
     current_bio = user.bio or "Не указано"
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(
+        callback,
         f"📝 <b>Изменить информацию о себе</b>\n\n"
         f"Текущая: {escape_html(current_bio)}\n\n"
         f"Напишите что-нибудь о себе:\n\n"
@@ -178,7 +181,8 @@ async def process_bio(message: Message, state: FSMContext):
 @router.callback_query(F.data == "payment_settings")
 async def payment_settings(callback: CallbackQuery):
     """Show payment settings (placeholder for future)."""
-    await callback.message.edit_text(
+    await safe_edit_or_answer(
+        callback,
         "💳 <b>Настройки оплаты</b>\n\n"
         "Интеграция оплаты скоро появится!\n\n"
         "<i>Эта функция позволит вам:\n"
@@ -196,7 +200,8 @@ async def payment_settings(callback: CallbackQuery):
 @router.callback_query(F.data == "get_verified")
 async def get_verified(callback: CallbackQuery):
     """Show verification options (placeholder for future)."""
-    await callback.message.edit_text(
+    await safe_edit_or_answer(
+        callback,
         "✅ <b>Верификация</b>\n\n"
         "Верификация продавцов скоро появится!\n\n"
         "<i>Преимущества верификации:\n"

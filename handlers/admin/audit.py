@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery
 from database.admin_models import AdminAuditLog, AdminUser
 from keyboards.admin_keyboards import get_admin_audit_log_keyboard, get_back_to_admin_keyboard
 from utils.decorators import require_admin
+from utils.helpers import safe_edit_or_answer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ router = Router(name="admin_audit")
 @require_admin
 async def admin_audit_log_menu(callback: CallbackQuery, admin: AdminUser):
     """Show admin audit log menu."""
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         "📋 <b>Журнал действий администраторов</b>\n\n"
         "Выберите фильтр:",
         reply_markup=get_admin_audit_log_keyboard()
@@ -36,7 +37,7 @@ async def admin_audit_log_filter(callback: CallbackQuery, admin: AdminUser):
     text += "Функционал журнала аудита находится в разработке.\n\n"
     text += f"Выбран фильтр: {filter_type}"
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         text,
         reply_markup=get_back_to_admin_keyboard()
     )

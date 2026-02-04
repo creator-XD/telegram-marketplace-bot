@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery
 from database.models import User
 from keyboards.admin_keyboards import get_admin_users_keyboard, get_back_to_admin_keyboard
 from utils.decorators import require_admin
+from utils.helpers import safe_edit_or_answer
 from database.admin_models import AdminUser
 import logging
 
@@ -18,7 +19,7 @@ router = Router(name="admin_users")
 @require_admin
 async def admin_users_menu(callback: CallbackQuery, admin: AdminUser):
     """Show admin users management menu."""
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         "👥 <b>Управление пользователями</b>\n\n"
         "Выберите действие:",
         reply_markup=get_admin_users_keyboard()
@@ -50,7 +51,7 @@ async def admin_users_filter(callback: CallbackQuery, admin: AdminUser):
         return
 
     if not users:
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             f"👥 <b>{title}</b>\n\n"
             "Пользователи не найдены.",
             reply_markup=get_back_to_admin_keyboard()
@@ -65,7 +66,7 @@ async def admin_users_filter(callback: CallbackQuery, admin: AdminUser):
     if len(users) > 10:
         text += f"\n<i>... и еще {len(users) - 10}</i>"
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         text,
         reply_markup=get_back_to_admin_keyboard()
     )

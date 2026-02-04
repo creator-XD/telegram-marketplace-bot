@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery
 from database.models import User, Listing, Transaction
 from keyboards.admin_keyboards import get_admin_analytics_keyboard, get_back_to_admin_keyboard
 from utils.decorators import require_admin
+from utils.helpers import safe_edit_or_answer
 from database.admin_models import AdminUser
 import logging
 
@@ -18,7 +19,7 @@ router = Router(name="admin_analytics")
 @require_admin
 async def admin_analytics_menu(callback: CallbackQuery, admin: AdminUser):
     """Show admin analytics menu."""
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         "📈 <b>Аналитика</b>\n\n"
         "Выберите раздел:",
         reply_markup=get_admin_analytics_keyboard()
@@ -54,7 +55,7 @@ async def admin_analytics_section(callback: CallbackQuery, admin: AdminUser):
         await callback.answer("Неизвестный раздел", show_alert=True)
         return
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         text,
         reply_markup=get_back_to_admin_keyboard()
     )

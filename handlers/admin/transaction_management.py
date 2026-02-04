@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery
 from database.models import Transaction
 from keyboards.admin_keyboards import get_admin_transactions_keyboard, get_back_to_admin_keyboard
 from utils.decorators import require_admin
+from utils.helpers import safe_edit_or_answer
 from database.admin_models import AdminUser
 import logging
 
@@ -18,7 +19,7 @@ router = Router(name="admin_transactions")
 @require_admin
 async def admin_transactions_menu(callback: CallbackQuery, admin: AdminUser):
     """Show admin transactions management menu."""
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         "💳 <b>Управление транзакциями</b>\n\n"
         "Выберите действие:",
         reply_markup=get_admin_transactions_keyboard()
@@ -50,7 +51,7 @@ async def admin_transactions_filter(callback: CallbackQuery, admin: AdminUser):
         return
 
     if not transactions:
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             f"💳 <b>{title}</b>\n\n"
             "Транзакции не найдены.",
             reply_markup=get_back_to_admin_keyboard()
@@ -65,7 +66,7 @@ async def admin_transactions_filter(callback: CallbackQuery, admin: AdminUser):
     if len(transactions) > 10:
         text += f"\n<i>... и еще {len(transactions) - 10}</i>"
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         text,
         reply_markup=get_back_to_admin_keyboard()
     )

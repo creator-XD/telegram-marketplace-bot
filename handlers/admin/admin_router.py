@@ -3,14 +3,15 @@ Main admin panel router and dashboard.
 """
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from database.models import User, Listing, Transaction
 from database.admin_models import AdminUser, AdminAuditLog
 from keyboards.admin_keyboards import get_admin_main_menu_keyboard
 from keyboards import get_main_menu_keyboard
 from utils.decorators import require_admin
+from utils.helpers import safe_edit_or_answer
 from utils.admin_helpers import format_admin_dashboard
-from config import BOT_NAME, MESSAGES
+from config import BOT_NAME, MESSAGES, WELCOME_IMAGE_PATH
 import logging
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ async def admin_command(message: Message, admin: AdminUser):
 @require_admin
 async def admin_menu_callback(callback: CallbackQuery, admin: AdminUser):
     """Show admin main menu."""
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         "🔧 <b>Админ-панель</b>\n\nВыберите раздел:",
         reply_markup=get_admin_main_menu_keyboard()
     )
@@ -65,7 +66,7 @@ async def admin_dashboard_callback(callback: CallbackQuery, admin: AdminUser):
 
     dashboard_text = format_admin_dashboard(stats)
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         dashboard_text,
         reply_markup=get_admin_main_menu_keyboard()
     )
@@ -77,8 +78,14 @@ async def admin_dashboard_callback(callback: CallbackQuery, admin: AdminUser):
 async def main_menu_callback(callback: CallbackQuery, admin: AdminUser):
     """Return to main user menu from admin panel."""
     welcome_text = MESSAGES["welcome"].format(bot_name=BOT_NAME)
-    await callback.message.edit_text(
-        welcome_text,
-        reply_markup=get_main_menu_keyboard()
+
+    # Delete the current message and send new photo message
+    await callback.message.delete()
+    welcome_image = FSInputFile(WELCOME_IMAGE_PATH)
+    await callback.message.answer_photo(
+        photo=welcome_image,
+        caption=welcome_text,
+        reply_markup=get_main_menu_keyboard(),
+        parse_mode="HTML",
     )
     await callback.answer()

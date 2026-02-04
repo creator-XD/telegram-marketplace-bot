@@ -23,6 +23,7 @@ from states import SearchStates
 from utils.helpers import (
     format_search_results_header,
     validate_price,
+    safe_edit_or_answer,
 )
 from config import PAGE_SIZE
 
@@ -48,7 +49,8 @@ async def cmd_search(message: Message, state: FSMContext):
 async def callback_search(callback: CallbackQuery, state: FSMContext):
     """Show search options."""
     await state.clear()
-    await callback.message.edit_text(
+    await safe_edit_or_answer(
+        callback,
         "🔍 <b>Поиск объявлений</b>\n\n"
         "Как вы хотите искать?",
         reply_markup=get_search_keyboard(),
@@ -86,8 +88,9 @@ async def search_by_keywords(callback: CallbackQuery, state: FSMContext):
         search_max_price=None,
         search_page=1,
     )
-    
-    await callback.message.edit_text(
+
+    await safe_edit_or_answer(
+        callback,
         "🔤 <b>Поиск по ключевым словам</b>\n\n"
         "Введите ключевые слова для поиска:\n\n"
         "<i>Пример: iPhone, кожаная куртка, велосипед</i>",
@@ -127,8 +130,9 @@ async def search_by_category(callback: CallbackQuery, state: FSMContext):
         search_max_price=None,
         search_page=1,
     )
-    
-    await callback.message.edit_text(
+
+    await safe_edit_or_answer(
+        callback,
         "📁 <b>Обзор по категориям</b>\n\n"
         "Выберите категорию:",
         reply_markup=get_categories_keyboard(
@@ -162,7 +166,8 @@ async def process_category_browse(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "search_price")
 async def search_by_price(callback: CallbackQuery, state: FSMContext):
     """Show price range options."""
-    await callback.message.edit_text(
+    await safe_edit_or_answer(
+        callback,
         "💰 <b>Фильтр по цене</b>\n\n"
         "Выберите диапазон цен:",
         reply_markup=get_price_range_keyboard(),
@@ -178,7 +183,8 @@ async def process_price_range(callback: CallbackQuery, state: FSMContext):
     
     if range_str == "custom":
         await state.set_state(SearchStates.waiting_for_min_price)
-        await callback.message.edit_text(
+        await safe_edit_or_answer(
+            callback,
             "💰 <b>Свой диапазон цен</b>\n\n"
             "Введите <b>минимальную</b> цену (или 0, если без минимума):",
             reply_markup=get_cancel_keyboard(),
@@ -289,7 +295,8 @@ async def show_search_results(callback: CallbackQuery, state: FSMContext):
     
     if not listings:
         text += "\n<i>Попробуйте другие фильтры или поисковые запросы.</i>"
-        await callback.message.edit_text(
+        await safe_edit_or_answer(
+            callback,
             text,
             reply_markup=get_search_keyboard(),
             parse_mode="HTML",
@@ -310,11 +317,12 @@ async def show_search_results(callback: CallbackQuery, state: FSMContext):
         keyboard.inline_keyboard.extend(pagination.inline_keyboard)
     else:
         keyboard.inline_keyboard.append([
-            {"text": "🔍 Новый поиск", "callback_data": "search"},
             {"text": "◀️ Меню", "callback_data": "back_to_menu"},
+            {"text": "🔍 Новый поиск", "callback_data": "search"},
         ])
-    
-    await callback.message.edit_text(
+
+    await safe_edit_or_answer(
+        callback,
         text,
         reply_markup=keyboard,
         parse_mode="HTML",
@@ -383,8 +391,8 @@ async def show_search_results_message(message: Message, state: FSMContext):
         keyboard.inline_keyboard.extend(pagination.inline_keyboard)
     else:
         keyboard.inline_keyboard.append([
-            {"text": "🔍 Новый поиск", "callback_data": "search"},
             {"text": "◀️ Меню", "callback_data": "back_to_menu"},
+            {"text": "🔍 Новый поиск", "callback_data": "search"},
         ])
     
     await message.answer(

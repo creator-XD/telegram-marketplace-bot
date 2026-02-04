@@ -10,6 +10,7 @@ from database.models import User, Listing, Message as DBMessage
 from keyboards import get_cancel_keyboard, get_main_menu_keyboard, get_back_keyboard
 from states import MessageStates
 from utils import format_listing_short, escape_html
+from utils.helpers import safe_edit_or_answer
 from config import MESSAGES
 
 logger = logging.getLogger(__name__)
@@ -38,8 +39,9 @@ async def contact_seller(callback: CallbackQuery, state: FSMContext):
         contact_seller_id=listing.user_id,
         contact_seller_telegram_id=listing.user.telegram_id,
     )
-    
-    await callback.message.edit_text(
+
+    await safe_edit_or_answer(
+        callback,
         f"💬 <b>Связаться с продавцом</b>\n\n"
         f"Объявление: <b>{escape_html(listing.title)}</b>\n"
         f"Продавец: {escape_html(listing.user.display_name)}\n\n"
@@ -171,8 +173,9 @@ async def reply_to_buyer(callback: CallbackQuery, state: FSMContext):
         reply_buyer_id=buyer_id,
         reply_listing_id=listing_id,
     )
-    
-    await callback.message.edit_text(
+
+    await safe_edit_or_answer(
+        callback,
         "💬 <b>Ответ покупателю</b>\n\n"
         "Напишите ваш ответ:",
         reply_markup=get_cancel_keyboard(),

@@ -21,7 +21,7 @@ from keyboards import (
 from keyboards.keyboards import get_done_keyboard, get_listings_keyboard
 from states import ListingStates
 from utils import format_listing_text, get_category_name
-from utils.helpers import validate_title, validate_description, validate_price
+from utils.helpers import validate_title, validate_description, validate_price, safe_edit_or_answer
 from config import MESSAGES, MAX_PHOTOS, PAGE_SIZE
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ async def cmd_my_listings(message: Message, state: FSMContext):
 async def callback_my_listings(callback: CallbackQuery, state: FSMContext):
     """Handle My Listings menu callback."""
     await state.clear()
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         "📝 <b>Мои объявления</b>\n\nУправляйте своими объявлениями здесь:",
         reply_markup=get_my_listings_keyboard(),
         parse_mode="HTML",
@@ -60,7 +60,7 @@ async def callback_my_active_listings(callback: CallbackQuery):
     listings = await Listing.get_by_user(user.id, status="active")
     
     if not listings:
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             "📭 У вас пока нет активных объявлений.\n\nНажмите 'Добавить объявление', чтобы создать!",
             reply_markup=get_my_listings_keyboard(),
             parse_mode="HTML",
@@ -76,7 +76,7 @@ async def callback_my_active_listings(callback: CallbackQuery):
         {"text": "◀️ Назад", "callback_data": "my_listings"}
     ])
     
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         text,
         reply_markup=keyboard,
         parse_mode="HTML",
@@ -91,7 +91,7 @@ async def callback_my_sold_listings(callback: CallbackQuery):
     listings = await Listing.get_by_user(user.id, status="sold")
     
     if not listings:
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             "📭 У вас пока нет проданных товаров.",
             reply_markup=get_my_listings_keyboard(),
             parse_mode="HTML",
@@ -106,7 +106,7 @@ async def callback_my_sold_listings(callback: CallbackQuery):
         {"text": "◀️ Назад", "callback_data": "my_listings"}
     ])
     
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         text,
         reply_markup=keyboard,
         parse_mode="HTML",
@@ -122,7 +122,7 @@ async def callback_add_listing(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ListingStates.waiting_for_title)
     await state.update_data(photos=[])
     
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         "➕ <b>Создание объявления</b>\n\n"
         "Шаг 1/5: Введите <b>название</b> вашего объявления:\n\n"
         "<i>Пример: iPhone 14 Pro Max 256GB</i>",
@@ -162,7 +162,7 @@ async def skip_description(callback: CallbackQuery, state: FSMContext):
     await state.update_data(description="")
     await state.set_state(ListingStates.waiting_for_price)
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         "Шаг 3/5: Введите <b>цену</b> вашего объявления:\n\n"
         "<i>Пример: 999.99</i>",
         reply_markup=get_cancel_keyboard(),
@@ -229,7 +229,7 @@ async def process_listing_category(callback: CallbackQuery, state: FSMContext):
     await state.update_data(category=category)
     await state.set_state(ListingStates.waiting_for_photos)
     
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         f"Шаг 5/5: Отправьте <b>фото</b> вашего товара (до {MAX_PHOTOS}):\n\n"
         "<i>Отправляйте фото по одному, затем нажмите 'Готово'.</i>\n"
         "<i>Вы также можете пропустить этот шаг.</i>",
@@ -309,7 +309,7 @@ async def show_listing_confirmation(callback: CallbackQuery, state: FSMContext):
     
     await state.set_state(ListingStates.confirm_listing)
     
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         text,
         reply_markup=get_confirm_keyboard(
             confirm_callback="confirm_create_listing",
@@ -349,7 +349,7 @@ async def confirm_create_listing(callback: CallbackQuery, state: FSMContext):
     
     logger.info(f"Listing created: {listing.id} by user {user.telegram_id}")
     
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         f"✅ <b>Объявление опубликовано!</b>\n\n"
         f"Ваше объявление \"{listing.title}\" теперь активно.\n\n"
         f"Покупатели теперь могут найти и связаться с вами по этому товару.",
@@ -413,7 +413,7 @@ async def view_listing(callback: CallbackQuery, bot: Bot):
                 reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite),
             )
     else:
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             text,
             reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite),
             parse_mode="HTML",
@@ -461,7 +461,7 @@ async def view_own_listing(callback: CallbackQuery, bot: Bot):
                 reply_markup=get_listing_detail_keyboard(listing_id, is_owner=True),
             )
     else:
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             text,
             reply_markup=get_listing_detail_keyboard(listing_id, is_owner=True),
             parse_mode="HTML",
@@ -523,7 +523,7 @@ async def edit_listing_menu(callback: CallbackQuery):
         await callback.answer("Вы можете редактировать только свои объявления.", show_alert=True)
         return
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         f"✏️ <b>Редактирование объявления</b>\n\n"
         f"<b>{listing.title}</b>\n\n"
         f"Выберите, что хотите изменить:",
@@ -549,7 +549,7 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
     
     if field == "title":
         await state.set_state(ListingStates.editing_title)
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             f"Текущее название: <b>{listing.title}</b>\n\n"
             f"Введите новое название:",
             reply_markup=get_back_keyboard(f"edit_listing:{listing_id}"),
@@ -558,7 +558,7 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
     elif field == "description":
         await state.set_state(ListingStates.editing_description)
         current_desc = listing.description[:100] + "..." if listing.description and len(listing.description) > 100 else (listing.description or "Нет")
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             f"Текущее описание: {current_desc}\n\n"
             f"Введите новое описание:",
             reply_markup=get_back_keyboard(f"edit_listing:{listing_id}"),
@@ -566,7 +566,7 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
         )
     elif field == "price":
         await state.set_state(ListingStates.editing_price)
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             f"Текущая цена: ${listing.price:.2f}\n\n"
             f"Введите новую цену:",
             reply_markup=get_back_keyboard(f"edit_listing:{listing_id}"),
@@ -574,7 +574,7 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
         )
     elif field == "category":
         await state.set_state(ListingStates.editing_category)
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             f"Текущая категория: {get_category_name(listing.category)}\n\n"
             f"Выберите новую категорию:",
             reply_markup=get_categories_keyboard(
@@ -585,7 +585,7 @@ async def edit_field(callback: CallbackQuery, state: FSMContext):
             parse_mode="HTML",
         )
     elif field == "photos":
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             "📷 <b>Управление фото</b>\n\n"
             "Чтобы обновить фото, удалите объявление и создайте новое.\n\n"
             "<i>Полное управление фото будет в будущем обновлении!</i>",
@@ -673,7 +673,7 @@ async def process_edit_category(callback: CallbackQuery, state: FSMContext):
     await listing.update(category=category)
     await state.clear()
     
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         MESSAGES["listing_updated"],
         reply_markup=get_edit_listing_keyboard(listing_id),
         parse_mode="HTML",
@@ -699,7 +699,7 @@ async def delete_listing_confirm(callback: CallbackQuery):
         await callback.answer("Вы можете удалять только свои объявления.", show_alert=True)
         return
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         f"🗑️ <b>Удалить объявление?</b>\n\n"
         f"Вы уверены, что хотите удалить:\n"
         f"<b>{listing.title}</b>\n\n"
@@ -723,7 +723,7 @@ async def confirm_delete_listing(callback: CallbackQuery):
         await listing.delete()
         logger.info(f"Listing deleted: {listing_id}")
     
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         MESSAGES["listing_deleted"],
         reply_markup=get_my_listings_keyboard(),
         parse_mode="HTML",
@@ -751,7 +751,7 @@ async def mark_as_sold(callback: CallbackQuery):
 
     await listing.update(status="sold")
 
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         f"✅ <b>Отмечено как продано!</b>\n\n"
         f"<b>{listing.title}</b> отмечено как проданное.\n\n"
         f"Поздравляем с продажей! 🎉",
@@ -800,7 +800,7 @@ async def callback_favorites(callback: CallbackQuery):
     listings = await Favorite.get_user_favorites(user.id)
     
     if not listings:
-        await callback.message.edit_text(
+        await safe_edit_or_answer(callback,
             "❤️ <b>Ваше избранное</b>\n\n"
             "Вы пока не сохранили ни одного объявления.\n\n"
             "Просматривайте объявления и нажимайте ❤️, чтобы сохранить их здесь!",
@@ -817,7 +817,7 @@ async def callback_favorites(callback: CallbackQuery):
         {"text": "◀️ В главное меню", "callback_data": "back_to_menu"}
     ])
     
-    await callback.message.edit_text(
+    await safe_edit_or_answer(callback,
         text,
         reply_markup=keyboard,
         parse_mode="HTML",

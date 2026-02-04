@@ -4,7 +4,7 @@ Common handlers for start, help, and general navigation.
 import logging
 from aiogram import Router, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 
 from database.models import User
@@ -12,7 +12,8 @@ from keyboards import (
     get_main_menu_keyboard,
     get_back_keyboard,
 )
-from config import MESSAGES, BOT_NAME, SUPPORT_USERNAME
+from config import MESSAGES, BOT_NAME, SUPPORT_USERNAME, WELCOME_IMAGE_PATH
+from utils.helpers import safe_edit_or_answer
 
 logger = logging.getLogger(__name__)
 router = Router(name="common")
@@ -23,7 +24,7 @@ async def cmd_start(message: Message, state: FSMContext):
     """Handle /start command."""
     # Clear any existing state
     await state.clear()
-    
+
     # Get or create user
     user = await User.get_or_create(
         telegram_id=message.from_user.id,
@@ -31,13 +32,16 @@ async def cmd_start(message: Message, state: FSMContext):
         first_name=message.from_user.first_name,
         last_name=message.from_user.last_name,
     )
-    
+
     logger.info(f"User started bot: {user.telegram_id} ({user.display_name})")
-    
+
     welcome_text = MESSAGES["welcome"].format(bot_name=BOT_NAME)
-    
-    await message.answer(
-        welcome_text,
+
+    # Send welcome image with caption
+    welcome_image = FSInputFile(WELCOME_IMAGE_PATH)
+    await message.answer_photo(
+        photo=welcome_image,
+        caption=welcome_text,
         reply_markup=get_main_menu_keyboard(),
         parse_mode="HTML",
     )
@@ -59,8 +63,9 @@ async def cmd_help(message: Message):
 async def callback_help(callback: CallbackQuery):
     """Handle help button callback."""
     help_text = MESSAGES["help"].format(support=SUPPORT_USERNAME)
-    
-    await callback.message.edit_text(
+
+    await safe_edit_or_answer(
+        callback,
         help_text,
         reply_markup=get_back_keyboard(),
         parse_mode="HTML",
@@ -92,11 +97,15 @@ async def cmd_cancel(message: Message, state: FSMContext):
 async def callback_cancel(callback: CallbackQuery, state: FSMContext):
     """Handle cancel button callback."""
     await state.clear()
-    
+
     welcome_text = MESSAGES["welcome"].format(bot_name=BOT_NAME)
-    
-    await callback.message.edit_text(
-        welcome_text,
+
+    # Delete the current message and send new photo message
+    await callback.message.delete()
+    welcome_image = FSInputFile(WELCOME_IMAGE_PATH)
+    await callback.message.answer_photo(
+        photo=welcome_image,
+        caption=welcome_text,
         reply_markup=get_main_menu_keyboard(),
         parse_mode="HTML",
     )
@@ -107,11 +116,15 @@ async def callback_cancel(callback: CallbackQuery, state: FSMContext):
 async def callback_back_to_menu(callback: CallbackQuery, state: FSMContext):
     """Handle back to menu callback."""
     await state.clear()
-    
+
     welcome_text = MESSAGES["welcome"].format(bot_name=BOT_NAME)
-    
-    await callback.message.edit_text(
-        welcome_text,
+
+    # Delete the current message and send new photo message
+    await callback.message.delete()
+    welcome_image = FSInputFile(WELCOME_IMAGE_PATH)
+    await callback.message.answer_photo(
+        photo=welcome_image,
+        caption=welcome_text,
         reply_markup=get_main_menu_keyboard(),
         parse_mode="HTML",
     )
