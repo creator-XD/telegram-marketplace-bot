@@ -217,8 +217,23 @@ class AdminAuditLog:
         return cls.from_row(row)
 
     @classmethod
-    async def get_recent(cls, limit: int = 50, admin_id: int = None, action: str = None) -> List["AdminAuditLog"]:
-        """Get recent audit log entries."""
+    async def get_recent(
+        cls,
+        limit: int = 50,
+        offset: int = 0,
+        admin_id: int = None,
+        action: str = None,
+        actions: List[str] = None
+    ) -> List["AdminAuditLog"]:
+        """Get recent audit log entries.
+
+        Args:
+            limit: Max number of entries to return.
+            offset: Number of entries to skip (for pagination).
+            admin_id: Filter by specific admin.
+            action: Filter by single action type (exact match).
+            actions: Filter by multiple action types (IN match).
+        """
         db = await get_db()
 
         conditions = []
@@ -228,19 +243,23 @@ class AdminAuditLog:
             conditions.append("admin_id = ?")
             params.append(admin_id)
 
-        if action:
+        if actions:
+            placeholders = ",".join(["?" for _ in actions])
+            conditions.append(f"action IN ({placeholders})")
+            params.extend(actions)
+        elif action:
             conditions.append("action = ?")
             params.append(action)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
-        params.append(limit)
+        params.extend([limit, offset])
 
         rows = await db.fetch_all(
             f"""
             SELECT * FROM admin_audit_log
             WHERE {where_clause}
             ORDER BY created_at DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """,
             tuple(params)
         )
@@ -252,6 +271,36 @@ class AdminAuditLog:
             log.admin_user = await User.get_by_id(log.admin_id)
 
         return logs
+
+    @classmethod
+    async def count(cls, admin_id: int = None, actions: List[str] = None) -> int:
+        """Count audit log entries matching filters.
+
+        Args:
+            admin_id: Filter by specific admin.
+            actions: Filter by multiple action types.
+        """
+        db = await get_db()
+
+        conditions = []
+        params = []
+
+        if admin_id:
+            conditions.append("admin_id = ?")
+            params.append(admin_id)
+
+        if actions:
+            placeholders = ",".join(["?" for _ in actions])
+            conditions.append(f"action IN ({placeholders})")
+            params.extend(actions)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        row = await db.fetch_one(
+            f"SELECT COUNT(*) as count FROM admin_audit_log WHERE {where_clause}",
+            tuple(params) if params else None
+        )
+        return row["count"] if row else 0
 
     @classmethod
     async def search(

@@ -196,6 +196,85 @@ def get_admin_pagination_keyboard(
     return builder.as_markup()
 
 
+def get_admin_user_list_keyboard(
+    users,
+    current_page: int,
+    total_pages: int,
+    filter_type: str,
+) -> InlineKeyboardMarkup:
+    """Get keyboard with clickable user list and pagination."""
+    builder = InlineKeyboardBuilder()
+
+    for user in users:
+        status = "🚫" if not user.is_active else ""
+        label = f"{status} {user.display_name} (ID:{user.id})"
+        builder.button(text=label[:50], callback_data=f"admin_view_user:{user.id}")
+
+    # Pagination row
+    if total_pages > 1:
+        if current_page > 1:
+            builder.button(text="⬅️", callback_data=f"admin_users_pg:{filter_type}:page:{current_page - 1}")
+        else:
+            builder.button(text=" ", callback_data="noop")
+
+        builder.button(text=f"{current_page}/{total_pages}", callback_data="noop")
+
+        if current_page < total_pages:
+            builder.button(text="➡️", callback_data=f"admin_users_pg:{filter_type}:page:{current_page + 1}")
+        else:
+            builder.button(text=" ", callback_data="noop")
+
+    builder.button(text="« Фильтры", callback_data="admin_users")
+
+    # 1 button per row for users, then 3 for pagination, 1 for back
+    rows = [1] * len(users)
+    if total_pages > 1:
+        rows.append(3)
+    rows.append(1)
+    builder.adjust(*rows)
+
+    return builder.as_markup()
+
+
+def get_admin_listing_list_keyboard(
+    listings,
+    current_page: int,
+    total_pages: int,
+    filter_type: str,
+) -> InlineKeyboardMarkup:
+    """Get keyboard with clickable listing list and pagination."""
+    builder = InlineKeyboardBuilder()
+
+    for listing in listings:
+        flag = "🚩 " if listing.flagged else ""
+        label = f"{flag}{listing.title[:35]} (ID:{listing.id})"
+        builder.button(text=label[:50], callback_data=f"admin_view_listing:{listing.id}")
+
+    # Pagination row
+    if total_pages > 1:
+        if current_page > 1:
+            builder.button(text="⬅️", callback_data=f"admin_listings_pg:{filter_type}:page:{current_page - 1}")
+        else:
+            builder.button(text=" ", callback_data="noop")
+
+        builder.button(text=f"{current_page}/{total_pages}", callback_data="noop")
+
+        if current_page < total_pages:
+            builder.button(text="➡️", callback_data=f"admin_listings_pg:{filter_type}:page:{current_page + 1}")
+        else:
+            builder.button(text=" ", callback_data="noop")
+
+    builder.button(text="« Фильтры", callback_data="admin_listings")
+
+    rows = [1] * len(listings)
+    if total_pages > 1:
+        rows.append(3)
+    rows.append(1)
+    builder.adjust(*rows)
+
+    return builder.as_markup()
+
+
 def get_back_to_admin_keyboard() -> InlineKeyboardMarkup:
     """Simple back to admin menu keyboard."""
     builder = InlineKeyboardBuilder()
