@@ -161,6 +161,7 @@ def format_admin_audit_log_text(log: AdminAuditLog) -> str:
         "listing_unflag": "✓",
         "listing_edit": "✏️",
         "listing_delete": "🗑️",
+        "review_delete": "⭐",
         "profile_edit": "👤",
     }
 

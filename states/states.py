@@ -47,6 +47,12 @@ class ProfileStates(StatesGroup):
     editing_bio = State()
 
 
+class ReviewStates(StatesGroup):
+    """States for leaving seller reviews."""
+    waiting_for_rating = State()
+    waiting_for_comment = State()
+
+
 class AdminStates(StatesGroup):
     """States for admin operations."""
     # User management

@@ -387,13 +387,13 @@ async def view_listing(callback: CallbackQuery, bot: Bot):
     if listing.photos:
         # Delete previous message
         await callback.message.delete()
-        
+
         if len(listing.photos) == 1:
             await bot.send_photo(
                 callback.from_user.id,
                 listing.photos[0].file_id,
                 caption=text,
-                reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite),
+                reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite, seller_id=listing.user_id),
                 parse_mode="HTML",
             )
         else:
@@ -410,15 +410,15 @@ async def view_listing(callback: CallbackQuery, bot: Bot):
             await bot.send_message(
                 callback.from_user.id,
                 "Выберите действие:",
-                reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite),
+                reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite, seller_id=listing.user_id),
             )
     else:
         await safe_edit_or_answer(callback,
             text,
-            reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite),
+            reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite, seller_id=listing.user_id),
             parse_mode="HTML",
         )
-    
+
     await callback.answer()
 
 
@@ -427,22 +427,22 @@ async def view_own_listing(callback: CallbackQuery, bot: Bot):
     """View own listing (as seller)."""
     listing_id = int(callback.data.split(":")[1])
     listing = await Listing.get_by_id(listing_id, with_photos=True)
-    
+
     if not listing:
         await callback.answer("Объявление не найдено.", show_alert=True)
         return
-    
+
     text = format_listing_text(listing, detailed=True)
-    
+
     if listing.photos:
         await callback.message.delete()
-        
+
         if len(listing.photos) == 1:
             await bot.send_photo(
                 callback.from_user.id,
                 listing.photos[0].file_id,
                 caption=text,
-                reply_markup=get_listing_detail_keyboard(listing_id, is_owner=True),
+                reply_markup=get_listing_detail_keyboard(listing_id, is_owner=True, seller_id=listing.user_id),
                 parse_mode="HTML",
             )
         else:
@@ -458,15 +458,15 @@ async def view_own_listing(callback: CallbackQuery, bot: Bot):
             await bot.send_message(
                 callback.from_user.id,
                 "Выберите действие:",
-                reply_markup=get_listing_detail_keyboard(listing_id, is_owner=True),
+                reply_markup=get_listing_detail_keyboard(listing_id, is_owner=True, seller_id=listing.user_id),
             )
     else:
         await safe_edit_or_answer(callback,
             text,
-            reply_markup=get_listing_detail_keyboard(listing_id, is_owner=True),
+            reply_markup=get_listing_detail_keyboard(listing_id, is_owner=True, seller_id=listing.user_id),
             parse_mode="HTML",
         )
-    
+
     await callback.answer()
 
 
@@ -836,11 +836,12 @@ async def add_to_favorites(callback: CallbackQuery):
     # Update the keyboard to show "remove from favorites" button
     listing = await Listing.get_by_id(listing_id)
     is_owner = listing.user_id == user.id if listing else False
+    seller_id = listing.user_id if listing else None
 
     # Update the message with new keyboard
     try:
         await callback.message.edit_reply_markup(
-            reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite=True)
+            reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite=True, seller_id=seller_id)
         )
     except Exception:
         pass  # Message might not be editable (e.g., media group)
@@ -859,11 +860,12 @@ async def remove_from_favorites(callback: CallbackQuery):
     # Update the keyboard to show "add to favorites" button
     listing = await Listing.get_by_id(listing_id)
     is_owner = listing.user_id == user.id if listing else False
+    seller_id = listing.user_id if listing else None
 
     # Update the message with new keyboard
     try:
         await callback.message.edit_reply_markup(
-            reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite=False)
+            reply_markup=get_listing_detail_keyboard(listing_id, is_owner, is_favorite=False, seller_id=seller_id)
         )
     except Exception:
         pass  # Message might not be editable (e.g., media group)

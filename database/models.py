@@ -4,7 +4,10 @@ Database models and operations for the Telegram Marketplace Bot.
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List
+import logging
 from .db import get_db
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -888,3 +891,160 @@ class Transaction:
             "completed": completed["count"] if completed else 0,
             "cancelled": cancelled["count"] if cancelled else 0,
         }
+
+
+@dataclass
+class Review:
+    """Review model for seller feedback."""
+    id: int
+    reviewer_id: int
+    seller_id: int
+    listing_id: Optional[int]
+    rating: int
+    comment: Optional[str]
+    created_at: Optional[datetime]
+
+    @classmethod
+    def from_row(cls, row) -> Optional["Review"]:
+        """Create Review from database row."""
+        if row is None:
+            return None
+        return cls(
+            id=row["id"],
+            reviewer_id=row["reviewer_id"],
+            seller_id=row["seller_id"],
+            listing_id=row["listing_id"],
+            rating=row["rating"],
+            comment=row["comment"],
+            created_at=row["created_at"],
+        )
+
+    @classmethod
+    async def create(
+        cls,
+        reviewer_id: int,
+        seller_id: int,
+        listing_id: int,
+        rating: int,
+        comment: Optional[str] = None,
+    ) -> Optional["Review"]:
+        """Create a new review and recalculate seller rating."""
+        db = await get_db()
+        try:
+            cursor = await db.execute(
+                """
+                INSERT INTO reviews (reviewer_id, seller_id, listing_id, rating, comment)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (reviewer_id, seller_id, listing_id, rating, comment)
+            )
+
+            # Recalculate seller's average rating
+            row = await db.fetch_one(
+                "SELECT AVG(rating) as avg_rating, COUNT(*) as cnt FROM reviews WHERE seller_id = ?",
+                (seller_id,)
+            )
+            if row:
+                await db.execute(
+                    "UPDATE users SET rating = ?, rating_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (round(row["avg_rating"], 2), row["cnt"], seller_id)
+                )
+
+            result_row = await db.fetch_one("SELECT * FROM reviews WHERE id = ?", (cursor.lastrowid,))
+            return cls.from_row(result_row)
+        except Exception as e:
+            logger.exception("Failed to create review")
+            return None
+
+    @classmethod
+    async def get_by_seller(cls, seller_id: int, limit: int = 10, offset: int = 0) -> List["Review"]:
+        """Get reviews for a seller."""
+        db = await get_db()
+        rows = await db.fetch_all(
+            """
+            SELECT * FROM reviews
+            WHERE seller_id = ?
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (seller_id, limit, offset)
+        )
+        return [cls.from_row(row) for row in rows]
+
+    @classmethod
+    async def count_by_seller(cls, seller_id: int) -> int:
+        """Count reviews for a seller."""
+        db = await get_db()
+        row = await db.fetch_one(
+            "SELECT COUNT(*) as count FROM reviews WHERE seller_id = ?",
+            (seller_id,)
+        )
+        return row["count"] if row else 0
+
+    @classmethod
+    async def get_by_id(cls, review_id: int) -> Optional["Review"]:
+        """Get review by ID."""
+        db = await get_db()
+        row = await db.fetch_one(
+            "SELECT * FROM reviews WHERE id = ?",
+            (review_id,)
+        )
+        return cls.from_row(row)
+
+    @classmethod
+    async def delete(cls, review_id: int, seller_id: int) -> bool:
+        """Delete a review and recalculate seller rating."""
+        db = await get_db()
+        try:
+            await db.execute("DELETE FROM reviews WHERE id = ?", (review_id,))
+
+            # Recalculate seller's average rating
+            row = await db.fetch_one(
+                "SELECT AVG(rating) as avg_rating, COUNT(*) as cnt FROM reviews WHERE seller_id = ?",
+                (seller_id,)
+            )
+            if row and row["cnt"] > 0:
+                await db.execute(
+                    "UPDATE users SET rating = ?, rating_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (round(row["avg_rating"], 2), row["cnt"], seller_id)
+                )
+            else:
+                await db.execute(
+                    "UPDATE users SET rating = 0, rating_count = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (seller_id,)
+                )
+            return True
+        except Exception:
+            logger.exception("Failed to delete review")
+            return False
+
+    @classmethod
+    async def get_all_admin(cls, limit: int = 50, offset: int = 0) -> List["Review"]:
+        """Get all reviews with pagination (for admin)."""
+        db = await get_db()
+        rows = await db.fetch_all(
+            """
+            SELECT * FROM reviews
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset)
+        )
+        return [cls.from_row(row) for row in rows]
+
+    @classmethod
+    async def count_all(cls) -> int:
+        """Count all reviews."""
+        db = await get_db()
+        row = await db.fetch_one("SELECT COUNT(*) as count FROM reviews")
+        return row["count"] if row else 0
+
+    @classmethod
+    async def get_by_reviewer_and_listing(cls, reviewer_id: int, listing_id: int) -> Optional["Review"]:
+        """Check if reviewer already reviewed this listing."""
+        db = await get_db()
+        row = await db.fetch_one(
+            "SELECT * FROM reviews WHERE reviewer_id = ? AND listing_id = ?",
+            (reviewer_id, listing_id)
+        )
+        return cls.from_row(row)

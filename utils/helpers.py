@@ -127,6 +127,21 @@ def format_user_profile(user: User) -> str:
     return text
 
 
+def format_review_text(review, reviewer: Optional[User] = None) -> str:
+    """Format a single review for display."""
+    stars = "⭐" * review.rating
+    reviewer_name = escape_html(reviewer.display_name) if reviewer else f"Пользователь #{review.reviewer_id}"
+    text = f"{stars}\n"
+    text += f"<b>{reviewer_name}</b>"
+    if review.created_at:
+        date_str = str(review.created_at)[:10]
+        text += f" — {date_str}"
+    text += "\n"
+    if review.comment:
+        text += f"{escape_html(review.comment)}\n"
+    return text
+
+
 def format_search_results_header(
     query: Optional[str] = None,
     category: Optional[str] = None,

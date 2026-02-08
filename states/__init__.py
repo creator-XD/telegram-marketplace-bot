@@ -6,6 +6,7 @@ from .states import (
     SearchStates,
     MessageStates,
     ProfileStates,
+    ReviewStates,
 )
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "SearchStates",
     "MessageStates",
     "ProfileStates",
+    "ReviewStates",
 ]

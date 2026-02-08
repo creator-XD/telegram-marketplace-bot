@@ -37,7 +37,7 @@ async def cmd_profile(message: Message, state: FSMContext):
     
     await message.answer(
         text,
-        reply_markup=get_profile_keyboard(),
+        reply_markup=get_profile_keyboard(user.id),
         parse_mode="HTML",
     )
 
@@ -60,27 +60,31 @@ async def callback_profile(callback: CallbackQuery, state: FSMContext):
     await safe_edit_or_answer(
         callback,
         text,
-        reply_markup=get_profile_keyboard(),
+        reply_markup=get_profile_keyboard(user.id),
         parse_mode="HTML",
     )
     await callback.answer()
 
 
-def get_profile_keyboard():
+def get_profile_keyboard(user_id: int = None):
     """Get profile management keyboard."""
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     from aiogram.types import InlineKeyboardButton
-    
+
     builder = InlineKeyboardBuilder()
-    
+
     builder.row(
         InlineKeyboardButton(text="📍 Изменить местоположение", callback_data="edit_location"),
         InlineKeyboardButton(text="📝 Изменить о себе", callback_data="edit_bio"),
     )
+    if user_id is not None:
+        builder.row(
+            InlineKeyboardButton(text="⭐ Мои отзывы", callback_data=f"seller_reviews:{user_id}"),
+        )
     builder.row(
         InlineKeyboardButton(text="◀️ В главное меню", callback_data="back_to_menu"),
     )
-    
+
     return builder.as_markup()
 
 
@@ -125,7 +129,7 @@ async def process_location(message: Message, state: FSMContext):
     await message.answer(
         "✅ <b>Местоположение обновлено!</b>\n\n"
         f"Ваше местоположение: {escape_html(location)}",
-        reply_markup=get_profile_keyboard(),
+        reply_markup=get_profile_keyboard(user.id),
         parse_mode="HTML",
     )
 
@@ -171,7 +175,7 @@ async def process_bio(message: Message, state: FSMContext):
     await message.answer(
         "✅ <b>Информация о себе обновлена!</b>\n\n"
         f"Ваша информация: {escape_html(bio)}",
-        reply_markup=get_profile_keyboard(),
+        reply_markup=get_profile_keyboard(user.id),
         parse_mode="HTML",
     )
 

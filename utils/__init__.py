@@ -8,6 +8,7 @@ from .helpers import (
     get_category_name,
     truncate_text,
     escape_html,
+    format_review_text,
 )
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "get_category_name",
     "truncate_text",
     "escape_html",
+    "format_review_text",
 ]

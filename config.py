@@ -119,7 +119,7 @@ PAYMENT_CONFIG = {
 # Future feature flags
 FEATURES = {
     "payments_enabled": False,
-    "reviews_enabled": False,
+    "reviews_enabled": True,
     "delivery_tracking": False,
     "verified_sellers": False,
     "promoted_listings": False,

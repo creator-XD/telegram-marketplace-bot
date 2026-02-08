@@ -5,7 +5,8 @@
       "Bash(python check_admin_setup.py:*)",
       "Bash(python:*)",
       "Bash(ls:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(.venv\\\\Scripts\\\\python.exe:*)"
     ]
   }
 }

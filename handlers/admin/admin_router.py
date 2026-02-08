@@ -19,13 +19,14 @@ logger = logging.getLogger(__name__)
 admin_router = Router(name="admin")
 
 # Import and include sub-routers
-from . import user_management, listing_management, transaction_management, analytics, audit
+from . import user_management, listing_management, transaction_management, analytics, audit, review_management
 
 admin_router.include_router(user_management.router)
 admin_router.include_router(listing_management.router)
 admin_router.include_router(transaction_management.router)
 admin_router.include_router(analytics.router)
 admin_router.include_router(audit.router)
+admin_router.include_router(review_management.router)
 
 
 @admin_router.message(Command("admin"))

@@ -227,10 +227,11 @@ def get_listing_detail_keyboard(
     listing_id: int,
     is_owner: bool = False,
     is_favorite: bool = False,
+    seller_id: int = None,
 ) -> InlineKeyboardMarkup:
     """Get detailed listing view keyboard."""
     builder = InlineKeyboardBuilder()
-    
+
     if is_owner:
         builder.row(
             InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_listing:{listing_id}"),
@@ -252,11 +253,22 @@ def get_listing_detail_keyboard(
         builder.row(
             InlineKeyboardButton(text=fav_text, callback_data=fav_callback),
         )
+        builder.row(
+            InlineKeyboardButton(text="⭐ Оставить отзыв", callback_data=f"leave_review:{listing_id}"),
+        )
+
+    if seller_id is not None:
+        builder.row(
+            InlineKeyboardButton(
+                text="📝 Отзывы о продавце",
+                callback_data=f"seller_reviews:{seller_id}"
+            ),
+        )
 
     builder.row(
         InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_listings"),
     )
-    
+
     return builder.as_markup()
 
 
@@ -359,6 +371,49 @@ def get_share_location_keyboard() -> ReplyKeyboardMarkup:
     builder.row(KeyboardButton(text="📍 Поделиться локацией", request_location=True))
     builder.row(KeyboardButton(text="⏭️ Пропустить"))
     return builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
+
+
+def get_rating_keyboard(listing_id: int) -> InlineKeyboardMarkup:
+    """Get star rating keyboard (1-5)."""
+    builder = InlineKeyboardBuilder()
+    stars = []
+    for i in range(1, 6):
+        stars.append(
+            InlineKeyboardButton(
+                text="⭐" * i,
+                callback_data=f"review_rating:{i}:{listing_id}"
+            )
+        )
+    # Two per row: 1-2, 3-4, then 5 alone
+    builder.row(stars[0], stars[1])
+    builder.row(stars[2], stars[3])
+    builder.row(stars[4])
+    builder.row(
+        InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+    )
+    return builder.as_markup()
+
+
+def get_review_comment_keyboard() -> InlineKeyboardMarkup:
+    """Get keyboard for review comment step (skip or cancel)."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="⏭️ Пропустить", callback_data="skip_review_comment"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+    )
+    return builder.as_markup()
+
+
+def get_seller_reviews_keyboard(seller_id: int) -> InlineKeyboardMarkup:
+    """Get button to view all seller reviews."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="⭐ Отзывы о продавце",
+            callback_data=f"seller_reviews:{seller_id}"
+        ),
+    )
+    return builder.as_markup()
 
 
 def remove_keyboard() -> ReplyKeyboardRemove:

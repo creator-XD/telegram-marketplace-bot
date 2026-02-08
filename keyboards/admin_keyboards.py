@@ -14,10 +14,11 @@ def get_admin_main_menu_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="📝 Объявления", callback_data="admin_listings")
     builder.button(text="💳 Транзакции", callback_data="admin_transactions")
     builder.button(text="📈 Аналитика", callback_data="admin_analytics")
-    builder.button(text="📋 Журнал действий", callback_data="admin_audit_log")
+    builder.button(text="⭐ Отзывы", callback_data="admin_reviews")
     builder.button(text="🏠 Главное меню", callback_data="main_menu")
+    builder.button(text="📋 Журнал действий", callback_data="admin_audit_log")
 
-    builder.adjust(2, 2, 2, 1)
+    builder.adjust(2, 2, 2, 2)
 
     return builder.as_markup()
 
@@ -267,6 +268,68 @@ def get_admin_listing_list_keyboard(
     builder.button(text="« Фильтры", callback_data="admin_listings")
 
     rows = [1] * len(listings)
+    if total_pages > 1:
+        rows.append(3)
+    rows.append(1)
+    builder.adjust(*rows)
+
+    return builder.as_markup()
+
+
+def get_admin_reviews_keyboard() -> InlineKeyboardMarkup:
+    """Get admin reviews management keyboard."""
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text="📋 Все отзывы", callback_data="admin_reviews:all")
+    builder.button(text="« Назад", callback_data="admin_menu")
+
+    builder.adjust(1, 1)
+
+    return builder.as_markup()
+
+
+def get_admin_review_actions_keyboard(review_id: int) -> InlineKeyboardMarkup:
+    """Get actions keyboard for a specific review."""
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text="🗑️ Удалить", callback_data=f"admin_review_delete:{review_id}")
+    builder.button(text="« Назад", callback_data="admin_reviews:all")
+
+    builder.adjust(1, 1)
+
+    return builder.as_markup()
+
+
+def get_admin_review_list_keyboard(
+    reviews,
+    current_page: int,
+    total_pages: int,
+) -> InlineKeyboardMarkup:
+    """Get keyboard with clickable review list and pagination."""
+    builder = InlineKeyboardBuilder()
+
+    for review in reviews:
+        stars = "⭐" * review.rating
+        label = f"{stars} ID:{review.id} (от #{review.reviewer_id})"
+        builder.button(text=label[:50], callback_data=f"admin_view_review:{review.id}")
+
+    # Pagination row
+    if total_pages > 1:
+        if current_page > 1:
+            builder.button(text="⬅️", callback_data=f"admin_reviews_pg:all:page:{current_page - 1}")
+        else:
+            builder.button(text=" ", callback_data="noop")
+
+        builder.button(text=f"{current_page}/{total_pages}", callback_data="noop")
+
+        if current_page < total_pages:
+            builder.button(text="➡️", callback_data=f"admin_reviews_pg:all:page:{current_page + 1}")
+        else:
+            builder.button(text=" ", callback_data="noop")
+
+    builder.button(text="« Назад", callback_data="admin_reviews")
+
+    rows = [1] * len(reviews)
     if total_pages > 1:
         rows.append(3)
     rows.append(1)

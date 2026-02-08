@@ -169,6 +169,21 @@ class Database:
                 FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
             );
 
+            -- Reviews table
+            CREATE TABLE IF NOT EXISTS reviews (
+                id INTEGER PRIMARY KEY,
+                reviewer_id INTEGER NOT NULL,
+                seller_id INTEGER NOT NULL,
+                listing_id INTEGER,
+                rating INTEGER NOT NULL,
+                comment TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE SET NULL,
+                UNIQUE(reviewer_id, seller_id, listing_id)
+            );
+
             -- Indexes for better query performance
             CREATE INDEX IF NOT EXISTS idx_listings_user ON listings(user_id);
             CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
@@ -181,6 +196,8 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_admin_audit_admin ON admin_audit_log(admin_id);
             CREATE INDEX IF NOT EXISTS idx_admin_audit_target ON admin_audit_log(target_type, target_id);
             CREATE INDEX IF NOT EXISTS idx_user_warnings_user ON user_warnings(user_id);
+            CREATE INDEX IF NOT EXISTS idx_reviews_seller ON reviews(seller_id);
+            CREATE INDEX IF NOT EXISTS idx_reviews_reviewer ON reviews(reviewer_id);
         """)
         await self.connection.commit()
         logger.info("Database tables initialized")
